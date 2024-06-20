@@ -113,12 +113,8 @@ impl eframe::App for PickMeApp {
                         if self.support {
                             all_heroes.append(&mut self.heroes.supports.clone());
                         }
-                        all_heroes.retain(|hero| {
-                            (self.favourite && hero.favourite) || self.favourite == false
-                        });
-                        all_heroes.retain(|hero| {
-                            (self.lowest && hero.level == lowest_level) || self.lowest == false
-                        });
+                        all_heroes.retain(|hero| !self.favourite || hero.favourite);
+                        all_heroes.retain(|hero| !self.lowest || hero.level == lowest_level);
                         self.picked = Some(
                             all_heroes
                                 .choose(&mut rand::thread_rng())
@@ -156,10 +152,9 @@ impl eframe::App for PickMeApp {
                             {
                                 tank.toggle_favourite();
                             }
-                            if self.tank
-                                && ((self.favourite && tank.favourite) || self.favourite == false)
-                                && ((self.lowest && tank.level == lowest_level)
-                                    || self.lowest == false)
+                            if (tank.level == lowest_level || !self.lowest)
+                                && (tank.favourite || !self.favourite)
+                                && self.tank
                             {
                                 ui.label(RichText::new(tank.to_string()).strong());
                             } else {
@@ -182,10 +177,9 @@ impl eframe::App for PickMeApp {
                             {
                                 damage.toggle_favourite();
                             }
-                            if self.damage
-                                && ((self.favourite && damage.favourite) || self.favourite == false)
-                                && ((self.lowest && damage.level == lowest_level)
-                                    || self.lowest == false)
+                            if (damage.level == lowest_level || !self.lowest)
+                                && (damage.favourite || !self.favourite)
+                                && self.damage
                             {
                                 ui.label(RichText::new(damage.to_string()).strong());
                             } else {
@@ -208,11 +202,9 @@ impl eframe::App for PickMeApp {
                             {
                                 support.toggle_favourite();
                             }
-                            if self.support
-                                && ((self.favourite && support.favourite)
-                                    || self.favourite == false)
-                                && ((self.lowest && support.level == lowest_level)
-                                    || self.lowest == false)
+                            if (support.level == lowest_level || !self.lowest)
+                                && (support.favourite || !self.favourite)
+                                && self.support
                             {
                                 ui.label(RichText::new(support.to_string()).strong());
                             } else {
