@@ -1,0 +1,10 @@
+[package]
+name = "pickme-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe ={ version = "0.27.2", features = ["persistence"]}
+rand = "0.8.5"
+serde = "1.0.203"
+serde_yaml = "0.9.34"
