@@ -3,6 +3,12 @@ use rand::prelude::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, fs::File};
 
+const KEY_TANK: &str = "tank";
+const KEY_DAMAGE: &str = "damage";
+const KEY_SUPPORT: &str = "support";
+const KEY_FAVOURITE: &str = "favourite";
+const KEY_LOWEST: &str = "lowest";
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Heroes {
     pub tanks: Vec<Hero>,
@@ -60,18 +66,18 @@ struct PickMeApp {
 }
 
 impl PickMeApp {
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let heroes_file = File::open("heroes.yaml").expect("Unable to open 'heroes.yaml'");
         let heroes: Heroes =
             serde_yaml::from_reader(heroes_file).expect("Unable to parse heroes from yaml");
         Self {
             heroes,
             picked: None,
-            tank: true,
-            damage: true,
-            support: true,
-            favourite: false,
-            lowest: false,
+            tank: get_bool_or_default(cc, KEY_TANK, true),
+            damage: get_bool_or_default(cc, KEY_DAMAGE, true),
+            support: get_bool_or_default(cc, KEY_SUPPORT, true),
+            favourite: get_bool_or_default(cc, KEY_FAVOURITE, false),
+            lowest: get_bool_or_default(cc, KEY_LOWEST, false),
         }
     }
 
@@ -217,8 +223,22 @@ impl eframe::App for PickMeApp {
         });
     }
 
-    fn save(&mut self, _storage: &mut dyn eframe::Storage) {
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
         let heroes_file = File::create("heroes.yaml").expect("Unable to open 'heroes.yaml'");
         serde_yaml::to_writer(heroes_file, &self.heroes).expect("Unable to save heroes to file");
+        storage.set_string(KEY_TANK, self.tank.to_string());
+        storage.set_string(KEY_DAMAGE, self.damage.to_string());
+        storage.set_string(KEY_SUPPORT, self.support.to_string());
+        storage.set_string(KEY_FAVOURITE, self.favourite.to_string());
+        storage.set_string(KEY_LOWEST, self.lowest.to_string());
     }
+}
+
+fn get_bool_or_default(cc: &eframe::CreationContext<'_>, key: &str, default: bool) -> bool {
+    cc.storage
+        .expect("Persistence feature not enabled")
+        .get_string(key)
+        .unwrap_or_default()
+        .parse::<bool>()
+        .unwrap_or(default)
 }
