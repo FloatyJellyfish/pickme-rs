@@ -1,7 +1,7 @@
 use eframe::egui::{self, Color32, RichText};
 use rand::prelude::SliceRandom;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, fs::File};
+use std::{fmt::Display, fs::File, path::Path};
 
 const KEY_TANK: &str = "tank";
 const KEY_DAMAGE: &str = "damage";
@@ -9,11 +9,83 @@ const KEY_SUPPORT: &str = "support";
 const KEY_FAVOURITE: &str = "favourite";
 const KEY_LOWEST: &str = "lowest";
 
+const HEROES_FILE_PATH: &str = "heroes.yaml";
+
+const TANKS: [&str; 12] = [
+    "D.va",
+    "Doomfist",
+    "Junker Queen",
+    "Mauga",
+    "Orisa",
+    "Ramatra",
+    "Reinhardt",
+    "Roadhog",
+    "Sigma",
+    "Winston",
+    "Wrecking Ball",
+    "Zarya",
+];
+
+const DAMAGES: [&str; 17] = [
+    "Ashe",
+    "Bastion",
+    "Cassidy",
+    "Echo",
+    "Genji",
+    "Hanzo",
+    "Junkrat",
+    "Mei",
+    "Pharah",
+    "Reaper",
+    "Sojourn",
+    "Soldier: 76",
+    "Sombra",
+    "Symmetra",
+    "Törbjorn",
+    "Venture",
+    "Widowmaker",
+];
+
+const SUPPORTS: [&str; 10] = [
+    "Ana",
+    "Baptiste",
+    "Brigitte",
+    "Illari",
+    "Kiriko",
+    "Lifeweaver",
+    "Lúcio",
+    "Mercy",
+    "Moira",
+    "Zenyatta",
+];
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Heroes {
     pub tanks: Vec<Hero>,
     pub damages: Vec<Hero>,
     pub supports: Vec<Hero>,
+}
+
+impl Default for Heroes {
+    fn default() -> Self {
+        let mut tanks = Vec::new();
+        for tank in TANKS {
+            tanks.push(Hero::new(tank))
+        }
+        let mut damages = Vec::new();
+        for damage in DAMAGES {
+            damages.push(Hero::new(damage))
+        }
+        let mut supports = Vec::new();
+        for support in SUPPORTS {
+            supports.push(Hero::new(support))
+        }
+        Self {
+            tanks,
+            damages,
+            supports,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -67,9 +139,12 @@ struct PickMeApp {
 
 impl PickMeApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let heroes_file = File::open("heroes.yaml").expect("Unable to open 'heroes.yaml'");
-        let heroes: Heroes =
-            serde_yaml::from_reader(heroes_file).expect("Unable to parse heroes from yaml");
+        let heroes = if Path::new(HEROES_FILE_PATH).exists() {
+            let heroes_file = File::open("heroes.yaml").expect("Unable to open 'heroes.yaml'");
+            serde_yaml::from_reader(heroes_file).expect("Unable to parse heroes from yaml")
+        } else {
+            Heroes::default()
+        };
         Self {
             heroes,
             picked: None,
@@ -224,7 +299,7 @@ impl eframe::App for PickMeApp {
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        let heroes_file = File::create("heroes.yaml").expect("Unable to open 'heroes.yaml'");
+        let heroes_file = File::create(HEROES_FILE_PATH).expect("Unable to open 'heroes.yaml'");
         serde_yaml::to_writer(heroes_file, &self.heroes).expect("Unable to save heroes to file");
         storage.set_string(KEY_TANK, self.tank.to_string());
         storage.set_string(KEY_DAMAGE, self.damage.to_string());
