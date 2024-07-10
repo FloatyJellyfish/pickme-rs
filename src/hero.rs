@@ -50,6 +50,13 @@ const SUPPORTS: [&str; 10] = [
     "Zenyatta",
 ];
 
+#[derive(PartialEq)]
+pub enum Role {
+    Tank,
+    Damage,
+    Support,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Heroes {
     pub tanks: Vec<Hero>,

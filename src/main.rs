@@ -1,17 +1,55 @@
-use eframe::egui::{self, Color32, RichText};
+use eframe::egui::{self, Color32, RichText, Ui};
 use hero::*;
 use rand::prelude::SliceRandom;
+use serde::{Deserialize, Serialize};
 use std::{fs::File, path::Path};
 
 mod hero;
 
-const KEY_TANK: &str = "tank";
-const KEY_DAMAGE: &str = "damage";
-const KEY_SUPPORT: &str = "support";
-const KEY_FAVOURITE: &str = "favourite";
-const KEY_LOWEST: &str = "lowest";
+const KEY_FILTERS: &str = "filters";
 
 const HEROES_FILE_PATH: &str = "heroes.yaml";
+
+#[derive(Serialize, Deserialize)]
+struct Filters {
+    tank: bool,
+    damage: bool,
+    support: bool,
+    favourite: bool,
+    lowest: bool,
+}
+
+impl Filters {
+    /// # Panics
+    /// Panics if `persistence` feature of eframe isn't enabled, or there was an error deserializing filters
+    fn load(cc: &eframe::CreationContext<'_>) -> Self {
+        let storage = cc.storage.expect("Persistence feature is not enabled");
+        match storage.get_string(KEY_FILTERS) {
+            None => Self::default(),
+            Some(string) => serde_json::from_str(&string).expect("Unable to deserialize filters"),
+        }
+    }
+
+    fn is_selected(&self, hero: &Hero, lowest_level: u32, role: Role) -> bool {
+        (hero.level == lowest_level || !self.lowest)
+            && (hero.favourite || !self.favourite)
+            && ((self.tank && role == Role::Tank)
+                || (self.support && role == Role::Support)
+                || (self.damage && role == Role::Damage))
+    }
+}
+
+impl Default for Filters {
+    fn default() -> Self {
+        Self {
+            tank: true,
+            damage: true,
+            support: true,
+            favourite: false,
+            lowest: false,
+        }
+    }
+}
 
 fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
@@ -24,11 +62,7 @@ fn main() -> Result<(), eframe::Error> {
 struct PickMeApp {
     heroes: Heroes,
     picked: Option<String>,
-    tank: bool,
-    damage: bool,
-    support: bool,
-    favourite: bool,
-    lowest: bool,
+    filters: Filters,
 }
 
 impl PickMeApp {
@@ -42,11 +76,7 @@ impl PickMeApp {
         Self {
             heroes,
             picked: None,
-            tank: get_bool_or_default(cc, KEY_TANK, true),
-            damage: get_bool_or_default(cc, KEY_DAMAGE, true),
-            support: get_bool_or_default(cc, KEY_SUPPORT, true),
-            favourite: get_bool_or_default(cc, KEY_FAVOURITE, false),
-            lowest: get_bool_or_default(cc, KEY_LOWEST, false),
+            filters: Filters::load(cc),
         }
     }
 
@@ -69,6 +99,26 @@ impl PickMeApp {
         }
         min
     }
+
+    fn draw_hero_row(ui: &mut Ui, hero: &mut Hero, selected: bool) {
+        ui.horizontal(|ui| {
+            if ui.button("⬆").clicked() {
+                hero.level_up();
+            }
+            let star = if hero.favourite { "★" } else { "☆" };
+            if ui
+                .button(RichText::new(star).color(Color32::YELLOW))
+                .clicked()
+            {
+                hero.toggle_favourite();
+            }
+            if selected {
+                ui.label(RichText::new(hero.to_string()).strong());
+            } else {
+                ui.label(RichText::new(hero.to_string()));
+            }
+        });
+    }
 }
 
 impl eframe::App for PickMeApp {
@@ -79,17 +129,18 @@ impl eframe::App for PickMeApp {
                 ui.horizontal(|ui| {
                     if ui.button("Pick Me").clicked() {
                         let mut all_heroes: Vec<Hero> = Vec::new();
-                        if self.tank {
+                        if self.filters.tank {
                             all_heroes.append(&mut self.heroes.tanks.clone());
                         }
-                        if self.damage {
+                        if self.filters.damage {
                             all_heroes.append(&mut self.heroes.damages.clone());
                         }
-                        if self.support {
+                        if self.filters.support {
                             all_heroes.append(&mut self.heroes.supports.clone());
                         }
-                        all_heroes.retain(|hero| !self.favourite || hero.favourite);
-                        all_heroes.retain(|hero| !self.lowest || hero.level == lowest_level);
+                        all_heroes.retain(|hero| !self.filters.favourite || hero.favourite);
+                        all_heroes
+                            .retain(|hero| !self.filters.lowest || hero.level == lowest_level);
                         self.picked = Some(
                             all_heroes
                                 .choose(&mut rand::thread_rng())
@@ -105,87 +156,43 @@ impl eframe::App for PickMeApp {
                     }
                 });
                 ui.horizontal(|ui| {
-                    ui.checkbox(&mut self.tank, "Tank");
-                    ui.checkbox(&mut self.damage, "Damage");
-                    ui.checkbox(&mut self.support, "Support");
-                    ui.checkbox(&mut self.favourite, "Favourite");
-                    ui.checkbox(&mut self.lowest, "Lowest");
+                    ui.checkbox(&mut self.filters.tank, "Tank");
+                    ui.checkbox(&mut self.filters.damage, "Damage");
+                    ui.checkbox(&mut self.filters.support, "Support");
+                    ui.checkbox(&mut self.filters.favourite, "Favourite");
+                    ui.checkbox(&mut self.filters.lowest, "Lowest");
                 });
             });
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     ui.heading("Tank");
                     for tank in self.heroes.tanks.iter_mut() {
-                        ui.horizontal(|ui| {
-                            if ui.button("⬆").clicked() {
-                                tank.level_up();
-                            }
-                            let star = if tank.favourite { "★" } else { "☆" };
-                            if ui
-                                .button(RichText::new(star).color(Color32::YELLOW))
-                                .clicked()
-                            {
-                                tank.toggle_favourite();
-                            }
-                            if (tank.level == lowest_level || !self.lowest)
-                                && (tank.favourite || !self.favourite)
-                                && self.tank
-                            {
-                                ui.label(RichText::new(tank.to_string()).strong());
-                            } else {
-                                ui.label(RichText::new(tank.to_string()));
-                            }
-                        });
+                        Self::draw_hero_row(
+                            ui,
+                            tank,
+                            self.filters.is_selected(tank, lowest_level, Role::Tank),
+                        );
                     }
                 });
                 ui.vertical(|ui| {
                     ui.heading("Damage");
                     for damage in self.heroes.damages.iter_mut() {
-                        ui.horizontal(|ui| {
-                            if ui.button("⬆").clicked() {
-                                damage.level_up();
-                            }
-                            let star = if damage.favourite { "★" } else { "☆" };
-                            if ui
-                                .button(RichText::new(star).color(Color32::YELLOW))
-                                .clicked()
-                            {
-                                damage.toggle_favourite();
-                            }
-                            if (damage.level == lowest_level || !self.lowest)
-                                && (damage.favourite || !self.favourite)
-                                && self.damage
-                            {
-                                ui.label(RichText::new(damage.to_string()).strong());
-                            } else {
-                                ui.label(RichText::new(damage.to_string()));
-                            }
-                        });
+                        Self::draw_hero_row(
+                            ui,
+                            damage,
+                            self.filters.is_selected(damage, lowest_level, Role::Damage),
+                        );
                     }
                 });
                 ui.vertical(|ui| {
                     ui.heading("Support");
                     for support in self.heroes.supports.iter_mut() {
-                        ui.horizontal(|ui| {
-                            if ui.button("⬆").clicked() {
-                                support.level_up();
-                            }
-                            let star = if support.favourite { "★" } else { "☆" };
-                            if ui
-                                .button(RichText::new(star).color(Color32::YELLOW))
-                                .clicked()
-                            {
-                                support.toggle_favourite();
-                            }
-                            if (support.level == lowest_level || !self.lowest)
-                                && (support.favourite || !self.favourite)
-                                && self.support
-                            {
-                                ui.label(RichText::new(support.to_string()).strong());
-                            } else {
-                                ui.label(RichText::new(support.to_string()));
-                            }
-                        });
+                        Self::draw_hero_row(
+                            ui,
+                            support,
+                            self.filters
+                                .is_selected(support, lowest_level, Role::Support),
+                        );
                     }
                 });
             })
@@ -195,19 +202,9 @@ impl eframe::App for PickMeApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         let heroes_file = File::create(HEROES_FILE_PATH).expect("Unable to open 'heroes.yaml'");
         serde_yaml::to_writer(heroes_file, &self.heroes).expect("Unable to save heroes to file");
-        storage.set_string(KEY_TANK, self.tank.to_string());
-        storage.set_string(KEY_DAMAGE, self.damage.to_string());
-        storage.set_string(KEY_SUPPORT, self.support.to_string());
-        storage.set_string(KEY_FAVOURITE, self.favourite.to_string());
-        storage.set_string(KEY_LOWEST, self.lowest.to_string());
+        storage.set_string(
+            KEY_FILTERS,
+            serde_json::to_string(&self.filters).expect("Unable to serialize filters"),
+        );
     }
-}
-
-fn get_bool_or_default(cc: &eframe::CreationContext<'_>, key: &str, default: bool) -> bool {
-    cc.storage
-        .expect("Persistence feature not enabled")
-        .get_string(key)
-        .unwrap_or_default()
-        .parse::<bool>()
-        .unwrap_or(default)
 }
