@@ -119,6 +119,21 @@ impl PickMeApp {
             }
         });
     }
+
+    fn draw_role_column(
+        ui: &mut Ui,
+        heroes: &mut Vec<Hero>,
+        role: Role,
+        filters: &Filters,
+        lowest_level: u32,
+    ) {
+        ui.vertical(|ui| {
+            ui.heading(role.to_string());
+            for hero in heroes {
+                Self::draw_hero_row(ui, hero, filters.is_selected(hero, lowest_level, role));
+            }
+        });
+    }
 }
 
 impl eframe::App for PickMeApp {
@@ -164,37 +179,27 @@ impl eframe::App for PickMeApp {
                 });
             });
             ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.heading("Tank");
-                    for tank in self.heroes.tanks.iter_mut() {
-                        Self::draw_hero_row(
-                            ui,
-                            tank,
-                            self.filters.is_selected(tank, lowest_level, Role::Tank),
-                        );
-                    }
-                });
-                ui.vertical(|ui| {
-                    ui.heading("Damage");
-                    for damage in self.heroes.damages.iter_mut() {
-                        Self::draw_hero_row(
-                            ui,
-                            damage,
-                            self.filters.is_selected(damage, lowest_level, Role::Damage),
-                        );
-                    }
-                });
-                ui.vertical(|ui| {
-                    ui.heading("Support");
-                    for support in self.heroes.supports.iter_mut() {
-                        Self::draw_hero_row(
-                            ui,
-                            support,
-                            self.filters
-                                .is_selected(support, lowest_level, Role::Support),
-                        );
-                    }
-                });
+                Self::draw_role_column(
+                    ui,
+                    self.heroes.tanks.as_mut(),
+                    Role::Tank,
+                    &self.filters,
+                    lowest_level,
+                );
+                Self::draw_role_column(
+                    ui,
+                    self.heroes.damages.as_mut(),
+                    Role::Damage,
+                    &self.filters,
+                    lowest_level,
+                );
+                Self::draw_role_column(
+                    ui,
+                    self.heroes.supports.as_mut(),
+                    Role::Support,
+                    &self.filters,
+                    lowest_level,
+                );
             })
         });
     }
