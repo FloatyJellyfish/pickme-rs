@@ -1,14 +1,20 @@
 use eframe::egui::{self, Color32, RichText, Ui};
 use hero::*;
 use rand::prelude::SliceRandom;
+use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
-use std::{fs::File, path::Path};
+use std::{
+    fs::File,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 mod hero;
 
 const KEY_FILTERS: &str = "filters";
+const KEY_FILE_PATH: &str = "file_path";
 
-const HEROES_FILE_PATH: &str = "heroes.yaml";
+const DEFAULT_FILE_PATH: &str = "heroes.yaml";
 
 #[derive(Serialize, Deserialize)]
 struct Filters {
@@ -63,20 +69,49 @@ struct PickMeApp {
     heroes: Heroes,
     picked: Option<String>,
     filters: Filters,
+    file_path: PathBuf,
 }
 
 impl PickMeApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let heroes = if Path::new(HEROES_FILE_PATH).exists() {
-            let heroes_file = File::open("heroes.yaml").expect("Unable to open 'heroes.yaml'");
-            serde_yaml::from_reader(heroes_file).expect("Unable to parse heroes from yaml")
-        } else {
-            Heroes::default()
-        };
+        let file_path = Self::load_file_path(cc);
+        let heroes = Self::load_heroes(&file_path);
+
         Self {
             heroes,
             picked: None,
             filters: Filters::load(cc),
+            file_path,
+        }
+    }
+
+    fn load_file_path(cc: &eframe::CreationContext<'_>) -> PathBuf {
+        let storage = cc.storage.expect("Persistence feature is not enabled");
+        if let Some(file_path) = storage.get_string(KEY_FILE_PATH) {
+            println!("Retrieved file path from storage: {file_path}");
+            PathBuf::from(file_path)
+        } else {
+            println!("Loading from default file path");
+            PathBuf::from_str(DEFAULT_FILE_PATH).unwrap()
+        }
+    }
+
+    fn load_heroes(path: &Path) -> Heroes {
+        if path.exists() {
+            if let Ok(file) = File::open(path) {
+                if let Ok(heroes) = serde_yaml::from_reader(file) {
+                    heroes
+                } else {
+                    println!("Could not parse heroes file, loading defaults");
+                    Heroes::default()
+                }
+            } else {
+                println!("Could not open heroes file, loading defaults");
+                Heroes::default()
+            }
+        } else {
+            println!("Heroes file does not exist, loading defaults");
+            Heroes::default()
         }
     }
 
@@ -139,6 +174,51 @@ impl PickMeApp {
 impl eframe::App for PickMeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let lowest_level = self.lowest_level();
+        egui::TopBottomPanel::top("menu").show(ctx, |ui| {
+            egui::menu::bar(ui, |ui| {
+                ui.menu_button("File", |ui| {
+                    if ui.button("New").clicked() {
+                        let file_path = FileDialog::new()
+                            .set_directory("./")
+                            .set_file_name("heroes.yaml")
+                            .add_filter("YAML", &["yaml"])
+                            .save_file();
+                        if let Some(file_path) = file_path {
+                            println!("Creating new heroes file: {}", file_path.to_str().unwrap());
+                            self.file_path = file_path;
+                            self.heroes = Heroes::default();
+                        }
+                    }
+                    if ui.button("Open..").clicked() {
+                        let file_path = FileDialog::new()
+                            .add_filter("YAML", &["yaml"])
+                            .set_directory("./")
+                            .pick_file();
+                        if let Some(file_path) = file_path {
+                            println!("Setting new file path: {}", file_path.to_str().unwrap());
+                            self.heroes = Self::load_heroes(&file_path);
+                            self.file_path = file_path;
+                        } else {
+                            println!("No file selected");
+                        }
+                    }
+                    if ui.button("Save As..").clicked() {
+                        let file_path = FileDialog::new()
+                            .set_directory("./")
+                            .set_file_name("heroes.yaml")
+                            .add_filter("YAML", &["yaml"])
+                            .save_file();
+                        if let Some(file_path) = file_path {
+                            println!(
+                                "Saving heroes into new file: {}",
+                                file_path.to_str().unwrap()
+                            );
+                            self.file_path = file_path;
+                        }
+                    }
+                })
+            })
+        });
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
@@ -205,11 +285,12 @@ impl eframe::App for PickMeApp {
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        let heroes_file = File::create(HEROES_FILE_PATH).expect("Unable to open 'heroes.yaml'");
+        let heroes_file = File::create(&self.file_path).expect("Unable to open 'heroes.yaml'");
         serde_yaml::to_writer(heroes_file, &self.heroes).expect("Unable to save heroes to file");
         storage.set_string(
             KEY_FILTERS,
             serde_json::to_string(&self.filters).expect("Unable to serialize filters"),
         );
+        storage.set_string(KEY_FILE_PATH, self.file_path.to_str().unwrap().to_string());
     }
 }
