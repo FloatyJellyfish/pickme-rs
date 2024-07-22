@@ -70,6 +70,9 @@ struct PickMeApp {
     picked: Option<String>,
     filters: Filters,
     file_path: PathBuf,
+    show_add_hero_dialog: bool,
+    hero_name: String,
+    role: Role,
 }
 
 impl PickMeApp {
@@ -82,6 +85,9 @@ impl PickMeApp {
             picked: None,
             filters: Filters::load(cc),
             file_path,
+            show_add_hero_dialog: false,
+            hero_name: String::new(),
+            role: Role::Tank,
         }
     }
 
@@ -216,6 +222,11 @@ impl eframe::App for PickMeApp {
                             self.file_path = file_path;
                         }
                     }
+                });
+                ui.menu_button("Hero", |ui| {
+                    if ui.button("New").clicked() {
+                        self.show_add_hero_dialog = true
+                    }
                 })
             })
         });
@@ -282,6 +293,80 @@ impl eframe::App for PickMeApp {
                 );
             })
         });
+
+        if self.show_add_hero_dialog {
+            ctx.show_viewport_immediate(
+                egui::ViewportId::from_hash_of("add_hero_dialog"),
+                egui::ViewportBuilder::default()
+                    .with_title("Add hero")
+                    .with_inner_size([220.0, 75.0]), /* .with_resizable(false)*/
+                |ctx, class| {
+                    assert!(
+                        class == egui::ViewportClass::Immediate,
+                        "This egui backend doesn't support multiple viewports"
+                    );
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        egui::Grid::new("add_hero_grid").show(ui, |ui| {
+                            ui.label("Role:");
+                            egui::ComboBox::from_id_source("role")
+                                .selected_text(format!("{}", self.role))
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(
+                                        &mut self.role,
+                                        Role::Tank,
+                                        Role::Tank.to_string(),
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.role,
+                                        Role::Damage,
+                                        Role::Damage.to_string(),
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.role,
+                                        Role::Support,
+                                        Role::Support.to_string(),
+                                    );
+                                });
+                            ui.end_row();
+
+                            ui.label("Hero name:");
+                            ui.text_edit_singleline(&mut self.hero_name);
+                            ui.end_row();
+
+                            if ui.button("Add").clicked() && !self.hero_name.is_empty() {
+                                match self.role {
+                                    Role::Tank => {
+                                        self.heroes.tanks.push(Hero::new(&self.hero_name));
+                                        self.heroes
+                                            .tanks
+                                            .sort_unstable_by_key(|hero| hero.name.clone());
+                                    }
+                                    Role::Damage => {
+                                        self.heroes.damages.push(Hero::new(&self.hero_name));
+                                        self.heroes
+                                            .damages
+                                            .sort_unstable_by_key(|hero| hero.name.clone());
+                                    }
+                                    Role::Support => {
+                                        self.heroes.supports.push(Hero::new(&self.hero_name));
+                                        self.heroes
+                                            .supports
+                                            .sort_unstable_by_key(|hero| hero.name.clone());
+                                    }
+                                }
+                                self.show_add_hero_dialog = false;
+                            }
+                            ui.end_row();
+                        });
+                    });
+
+                    if ctx.input(|i| i.viewport().close_requested()) {
+                        // Tell parent viewport that we should not show next frame:
+                        self.show_add_hero_dialog = false;
+                    }
+                },
+            )
+        }
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
