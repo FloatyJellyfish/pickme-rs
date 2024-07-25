@@ -126,3 +126,9 @@ impl Display for Hero {
         write!(f, "{} - {}", self.level, self.name)
     }
 }
+
+impl PartialEq for Hero {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}

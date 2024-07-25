@@ -23,6 +23,8 @@ struct Filters {
     support: bool,
     favourite: bool,
     lowest: bool,
+    #[serde(default = "Default::default")]
+    unique: bool,
 }
 
 impl Filters {
@@ -36,12 +38,19 @@ impl Filters {
         }
     }
 
-    fn is_selected(&self, hero: &Hero, lowest_level: u32, role: Role) -> bool {
+    fn is_selected(
+        &self,
+        hero: &Hero,
+        lowest_level: u32,
+        role: Role,
+        session_picked: &[Hero],
+    ) -> bool {
         (hero.level == lowest_level || !self.lowest)
             && (hero.favourite || !self.favourite)
             && ((self.tank && role == Role::Tank)
                 || (self.support && role == Role::Support)
                 || (self.damage && role == Role::Damage))
+            && !(self.unique && session_picked.contains(hero))
     }
 }
 
@@ -53,6 +62,7 @@ impl Default for Filters {
             support: true,
             favourite: false,
             lowest: false,
+            unique: false,
         }
     }
 }
@@ -73,6 +83,7 @@ struct PickMeApp {
     show_add_hero_dialog: bool,
     hero_name: String,
     role: Role,
+    session_picked: Vec<Hero>,
 }
 
 impl PickMeApp {
@@ -88,6 +99,7 @@ impl PickMeApp {
             show_add_hero_dialog: false,
             hero_name: String::new(),
             role: Role::Tank,
+            session_picked: Vec::new(),
         }
     }
 
@@ -167,11 +179,16 @@ impl PickMeApp {
         role: Role,
         filters: &Filters,
         lowest_level: u32,
+        session_picked: &[Hero],
     ) {
         ui.vertical(|ui| {
             ui.heading(role.to_string());
             for hero in heroes {
-                Self::draw_hero_row(ui, hero, filters.is_selected(hero, lowest_level, role));
+                Self::draw_hero_row(
+                    ui,
+                    hero,
+                    filters.is_selected(hero, lowest_level, role, session_picked),
+                );
             }
         });
     }
@@ -235,25 +252,43 @@ impl eframe::App for PickMeApp {
                 ui.horizontal(|ui| {
                     if ui.button("Pick Me").clicked() {
                         let mut all_heroes: Vec<Hero> = Vec::new();
-                        if self.filters.tank {
-                            all_heroes.append(&mut self.heroes.tanks.clone());
+                        let mut tanks = self.heroes.tanks.clone();
+                        tanks.retain(|hero| {
+                            self.filters.is_selected(
+                                hero,
+                                lowest_level,
+                                Role::Tank,
+                                &self.session_picked,
+                            )
+                        });
+                        let mut damages = self.heroes.damages.clone();
+                        damages.retain(|hero| {
+                            self.filters.is_selected(
+                                hero,
+                                lowest_level,
+                                Role::Damage,
+                                &self.session_picked,
+                            )
+                        });
+                        let mut supports = self.heroes.supports.clone();
+                        supports.retain(|hero| {
+                            self.filters.is_selected(
+                                hero,
+                                lowest_level,
+                                Role::Support,
+                                &self.session_picked,
+                            )
+                        });
+                        all_heroes.append(&mut tanks);
+                        all_heroes.append(&mut damages);
+                        all_heroes.append(&mut supports);
+                        let hero = all_heroes
+                            .choose(&mut rand::thread_rng())
+                            .expect("No heroes to choose from :(");
+                        self.picked = Some(hero.name.clone());
+                        if self.filters.unique {
+                            self.session_picked.push(hero.clone());
                         }
-                        if self.filters.damage {
-                            all_heroes.append(&mut self.heroes.damages.clone());
-                        }
-                        if self.filters.support {
-                            all_heroes.append(&mut self.heroes.supports.clone());
-                        }
-                        all_heroes.retain(|hero| !self.filters.favourite || hero.favourite);
-                        all_heroes
-                            .retain(|hero| !self.filters.lowest || hero.level == lowest_level);
-                        self.picked = Some(
-                            all_heroes
-                                .choose(&mut rand::thread_rng())
-                                .expect("No heroes to choose from :(")
-                                .name
-                                .clone(),
-                        );
                     }
                     if let Some(hero) = &self.picked {
                         ui.heading(hero);
@@ -267,6 +302,11 @@ impl eframe::App for PickMeApp {
                     ui.checkbox(&mut self.filters.support, "Support");
                     ui.checkbox(&mut self.filters.favourite, "Favourite");
                     ui.checkbox(&mut self.filters.lowest, "Lowest");
+                    if ui.checkbox(&mut self.filters.unique, "Unique").clicked()
+                        && !self.filters.unique
+                    {
+                        self.session_picked = Vec::new();
+                    }
                 });
             });
             ui.horizontal(|ui| {
@@ -276,6 +316,7 @@ impl eframe::App for PickMeApp {
                     Role::Tank,
                     &self.filters,
                     lowest_level,
+                    &self.session_picked,
                 );
                 Self::draw_role_column(
                     ui,
@@ -283,6 +324,7 @@ impl eframe::App for PickMeApp {
                     Role::Damage,
                     &self.filters,
                     lowest_level,
+                    &self.session_picked,
                 );
                 Self::draw_role_column(
                     ui,
@@ -290,6 +332,7 @@ impl eframe::App for PickMeApp {
                     Role::Support,
                     &self.filters,
                     lowest_level,
+                    &self.session_picked,
                 );
             })
         });
