@@ -135,19 +135,25 @@ impl PickMeApp {
 
     fn lowest_level(&self) -> u32 {
         let mut min = u32::MAX;
-        for hero in self.heroes.tanks.iter() {
-            if hero.level < min {
-                min = hero.level;
+        if self.filters.tank {
+            for hero in self.heroes.tanks.iter() {
+                if hero.level < min {
+                    min = hero.level;
+                }
             }
         }
-        for hero in self.heroes.damages.iter() {
-            if hero.level < min {
-                min = hero.level;
+        if self.filters.damage {
+            for hero in self.heroes.damages.iter() {
+                if hero.level < min {
+                    min = hero.level;
+                }
             }
         }
-        for hero in self.heroes.supports.iter() {
-            if hero.level < min {
-                min = hero.level;
+        if self.filters.support {
+            for hero in self.heroes.supports.iter() {
+                if hero.level < min {
+                    min = hero.level;
+                }
             }
         }
         min
