@@ -198,6 +198,29 @@ impl PickMeApp {
             }
         });
     }
+
+    fn apply_filters(&self, lowest_level: u32) -> Vec<Hero> {
+        let mut all_heroes: Vec<Hero> = Vec::new();
+        let mut tanks = self.heroes.tanks.clone();
+        tanks.retain(|hero| {
+            self.filters
+                .is_selected(hero, lowest_level, Role::Tank, &self.session_picked)
+        });
+        let mut damages = self.heroes.damages.clone();
+        damages.retain(|hero| {
+            self.filters
+                .is_selected(hero, lowest_level, Role::Damage, &self.session_picked)
+        });
+        let mut supports = self.heroes.supports.clone();
+        supports.retain(|hero| {
+            self.filters
+                .is_selected(hero, lowest_level, Role::Support, &self.session_picked)
+        });
+        all_heroes.append(&mut tanks);
+        all_heroes.append(&mut damages);
+        all_heroes.append(&mut supports);
+        all_heroes
+    }
 }
 
 impl eframe::App for PickMeApp {
@@ -257,43 +280,20 @@ impl eframe::App for PickMeApp {
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
                     if ui.button("Pick Me").clicked() {
-                        let mut all_heroes: Vec<Hero> = Vec::new();
-                        let mut tanks = self.heroes.tanks.clone();
-                        tanks.retain(|hero| {
-                            self.filters.is_selected(
-                                hero,
-                                lowest_level,
-                                Role::Tank,
-                                &self.session_picked,
-                            )
-                        });
-                        let mut damages = self.heroes.damages.clone();
-                        damages.retain(|hero| {
-                            self.filters.is_selected(
-                                hero,
-                                lowest_level,
-                                Role::Damage,
-                                &self.session_picked,
-                            )
-                        });
-                        let mut supports = self.heroes.supports.clone();
-                        supports.retain(|hero| {
-                            self.filters.is_selected(
-                                hero,
-                                lowest_level,
-                                Role::Support,
-                                &self.session_picked,
-                            )
-                        });
-                        all_heroes.append(&mut tanks);
-                        all_heroes.append(&mut damages);
-                        all_heroes.append(&mut supports);
-                        let hero = all_heroes
-                            .choose(&mut rand::thread_rng())
-                            .expect("No heroes to choose from :(");
-                        self.picked = Some(hero.name.clone());
-                        if self.filters.unique {
-                            self.session_picked.push(hero.clone());
+                        let mut all_heroes = self.apply_filters(lowest_level);
+
+                        if all_heroes.is_empty() && !self.session_picked.is_empty() {
+                            self.session_picked.clear();
+                            all_heroes = self.apply_filters(lowest_level);
+                        }
+
+                        if let Some(hero) = all_heroes.choose(&mut rand::thread_rng()) {
+                            self.picked = Some(hero.name.clone());
+                            if self.filters.unique {
+                                self.session_picked.push(hero.clone());
+                            }
+                        } else {
+                            self.picked = Some("Empty selection".to_string());
                         }
                     }
                     if let Some(hero) = &self.picked {
