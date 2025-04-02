@@ -419,6 +419,10 @@ impl eframe::App for PickMeApp {
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+	if let Some(parent_dir) = self.file_path.parent() {
+	    std::fs::create_dir_all(parent_dir).expect("Unable to create parent directory");
+	}
+	
         let heroes_file = File::create(&self.file_path).expect("Unable to open 'heroes.yaml'");
         serde_yaml::to_writer(heroes_file, &self.heroes).expect("Unable to save heroes to file");
         storage.set_string(
