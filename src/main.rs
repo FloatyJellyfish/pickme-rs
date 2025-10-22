@@ -25,6 +25,8 @@ struct Filters {
     lowest: bool,
     #[serde(default = "Default::default")]
     unique: bool,
+    #[serde(default)]
+    stadium: bool,
 }
 
 impl Filters {
@@ -51,6 +53,7 @@ impl Filters {
                 || (self.support && role == Role::Support)
                 || (self.damage && role == Role::Damage))
             && !(self.unique && session_picked.contains(hero))
+            && (if self.stadium { hero.stadium } else { true })
     }
 }
 
@@ -63,6 +66,7 @@ impl Default for Filters {
             favourite: false,
             lowest: false,
             unique: false,
+            stadium: false,
         }
     }
 }
@@ -71,7 +75,7 @@ fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "Pick Me",
         eframe::NativeOptions::default(),
-        Box::new(|cc| Box::new(PickMeApp::new(cc))),
+        Box::new(|cc| Ok(Box::new(PickMeApp::new(cc)))),
     )
 }
 
@@ -227,7 +231,7 @@ impl eframe::App for PickMeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let lowest_level = self.lowest_level();
         egui::TopBottomPanel::top("menu").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("New").clicked() {
                         let file_path = FileDialog::new()
@@ -313,6 +317,7 @@ impl eframe::App for PickMeApp {
                     {
                         self.session_picked = Vec::new();
                     }
+                    ui.checkbox(&mut self.filters.stadium, "Stadium");
                 });
             });
             ui.horizontal(|ui| {
@@ -357,7 +362,7 @@ impl eframe::App for PickMeApp {
                     egui::CentralPanel::default().show(ctx, |ui| {
                         egui::Grid::new("add_hero_grid").show(ui, |ui| {
                             ui.label("Role:");
-                            egui::ComboBox::from_id_source("role")
+                            egui::ComboBox::from_id_salt("role")
                                 .selected_text(format!("{}", self.role))
                                 .show_ui(ui, |ui| {
                                     ui.selectable_value(
@@ -385,19 +390,19 @@ impl eframe::App for PickMeApp {
                             if ui.button("Add").clicked() && !self.hero_name.is_empty() {
                                 match self.role {
                                     Role::Tank => {
-                                        self.heroes.tanks.push(Hero::new(&self.hero_name));
+                                        self.heroes.tanks.push(Hero::new(&self.hero_name, Role::Tank, false));
                                         self.heroes
                                             .tanks
                                             .sort_unstable_by_key(|hero| hero.name.clone());
                                     }
                                     Role::Damage => {
-                                        self.heroes.damages.push(Hero::new(&self.hero_name));
+                                        self.heroes.damages.push(Hero::new(&self.hero_name, Role::Damage, false));
                                         self.heroes
                                             .damages
                                             .sort_unstable_by_key(|hero| hero.name.clone());
                                     }
                                     Role::Support => {
-                                        self.heroes.supports.push(Hero::new(&self.hero_name));
+                                        self.heroes.supports.push(Hero::new(&self.hero_name, Role::Support, false));
                                         self.heroes
                                             .supports
                                             .sort_unstable_by_key(|hero| hero.name.clone());
