@@ -26,6 +26,41 @@ pub struct Heroes {
     pub supports: Vec<Hero>,
 }
 
+impl Heroes {
+    pub fn migrate(&mut self) {
+        let default = Self::default();
+        Self::add_missing(&mut self.tanks, &default.tanks);
+        Self::add_missing(&mut self.damages, &default.damages);
+        Self::add_missing(&mut self.supports, &default.supports);
+        Self::set_stadium(&mut self.tanks, &default.tanks);
+        Self::set_stadium(&mut self.damages, &default.damages);
+        Self::set_stadium(&mut self.supports, &default.supports);
+    }
+
+    /// Add any additional heroes in `new` to `old`
+    fn add_missing(old: &mut Vec<Hero>, new: &[Hero]) {
+        for hero in new {
+            if !old.contains(hero) {
+                println!("Adding new hero '{}'", hero.name);
+                old.push(hero.clone());
+            }
+        }
+        old.sort_unstable_by_key(|h| h.name.clone());
+    }
+
+    /// Set stadium enabled for any hero in `old` where it is set in `new`
+    fn set_stadium(old: &mut Vec<Hero>, new: &[Hero]) {
+        for hero in old {
+            if let Some(new_hero) = new.iter().find(|h| hero.name == h.name) {
+                if new_hero.stadium && !hero.stadium {
+                    println!("Setting stadium enable for '{}'", new_hero.name);
+                    hero.stadium |= new_hero.stadium;
+                }
+            }
+        }
+    }
+}
+
 impl Default for Heroes {
     fn default() -> Self {
         Self {

@@ -121,7 +121,8 @@ impl PickMeApp {
     fn load_heroes(path: &Path) -> Heroes {
         if path.exists() {
             if let Ok(file) = File::open(path) {
-                if let Ok(heroes) = serde_yaml::from_reader(file) {
+                if let Ok(mut heroes) = serde_yaml::from_reader::<File, Heroes>(file) {
+                    heroes.migrate();
                     heroes
                 } else {
                     println!("Could not parse heroes file, loading defaults");
