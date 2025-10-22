@@ -390,19 +390,31 @@ impl eframe::App for PickMeApp {
                             if ui.button("Add").clicked() && !self.hero_name.is_empty() {
                                 match self.role {
                                     Role::Tank => {
-                                        self.heroes.tanks.push(Hero::new(&self.hero_name, Role::Tank, false));
+                                        self.heroes.tanks.push(Hero::new(
+                                            &self.hero_name,
+                                            Role::Tank,
+                                            false,
+                                        ));
                                         self.heroes
                                             .tanks
                                             .sort_unstable_by_key(|hero| hero.name.clone());
                                     }
                                     Role::Damage => {
-                                        self.heroes.damages.push(Hero::new(&self.hero_name, Role::Damage, false));
+                                        self.heroes.damages.push(Hero::new(
+                                            &self.hero_name,
+                                            Role::Damage,
+                                            false,
+                                        ));
                                         self.heroes
                                             .damages
                                             .sort_unstable_by_key(|hero| hero.name.clone());
                                     }
                                     Role::Support => {
-                                        self.heroes.supports.push(Hero::new(&self.hero_name, Role::Support, false));
+                                        self.heroes.supports.push(Hero::new(
+                                            &self.hero_name,
+                                            Role::Support,
+                                            false,
+                                        ));
                                         self.heroes
                                             .supports
                                             .sort_unstable_by_key(|hero| hero.name.clone());
@@ -424,10 +436,10 @@ impl eframe::App for PickMeApp {
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-	if let Some(parent_dir) = self.file_path.parent() {
-	    std::fs::create_dir_all(parent_dir).expect("Unable to create parent directory");
-	}
-	
+        if let Some(parent_dir) = self.file_path.parent() {
+            std::fs::create_dir_all(parent_dir).expect("Unable to create parent directory");
+        }
+
         let heroes_file = File::create(&self.file_path).expect("Unable to open 'heroes.yaml'");
         serde_yaml::to_writer(heroes_file, &self.heroes).expect("Unable to save heroes to file");
         storage.set_string(

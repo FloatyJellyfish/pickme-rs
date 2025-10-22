@@ -26,7 +26,6 @@ pub struct Heroes {
     pub supports: Vec<Hero>,
 }
 
-
 impl Default for Heroes {
     fn default() -> Self {
         Self {
