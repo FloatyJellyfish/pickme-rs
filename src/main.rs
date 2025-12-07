@@ -40,15 +40,8 @@ impl Filters {
         }
     }
 
-    fn is_selected(
-        &self,
-        hero: &Hero,
-        lowest_level: u32,
-        role: Role,
-        session_picked: &[Hero],
-    ) -> bool {
-        (hero.level == lowest_level || !self.lowest)
-            && (hero.favourite || !self.favourite)
+    fn is_selected(&self, hero: &Hero, role: Role, session_picked: &[Hero]) -> bool {
+        (hero.favourite || !self.favourite)
             && ((self.tank && role == Role::Tank)
                 || (self.support && role == Role::Support)
                 || (self.damage && role == Role::Damage))
@@ -139,29 +132,10 @@ impl PickMeApp {
     }
 
     fn lowest_level(&self) -> u32 {
-        let mut min = u32::MAX;
-        if self.filters.tank {
-            for hero in self.heroes.tanks.iter() {
-                if hero.level < min {
-                    min = hero.level;
-                }
-            }
-        }
-        if self.filters.damage {
-            for hero in self.heroes.damages.iter() {
-                if hero.level < min {
-                    min = hero.level;
-                }
-            }
-        }
-        if self.filters.support {
-            for hero in self.heroes.supports.iter() {
-                if hero.level < min {
-                    min = hero.level;
-                }
-            }
-        }
-        min
+        let heroes = self.apply_filters();
+        heroes
+            .iter()
+            .fold(u32::MAX, |acc, hero| hero.level.min(acc))
     }
 
     fn draw_hero_row(ui: &mut Ui, hero: &mut Hero, selected: bool) {
@@ -198,32 +172,38 @@ impl PickMeApp {
                 Self::draw_hero_row(
                     ui,
                     hero,
-                    filters.is_selected(hero, lowest_level, role, session_picked),
+                    (!filters.lowest || lowest_level == hero.level)
+                        && filters.is_selected(hero, role, session_picked),
                 );
             }
         });
     }
 
-    fn apply_filters(&self, lowest_level: u32) -> Vec<Hero> {
+    fn apply_filters(&self) -> Vec<Hero> {
         let mut all_heroes: Vec<Hero> = Vec::new();
         let mut tanks = self.heroes.tanks.clone();
         tanks.retain(|hero| {
             self.filters
-                .is_selected(hero, lowest_level, Role::Tank, &self.session_picked)
+                .is_selected(hero, Role::Tank, &self.session_picked)
         });
         let mut damages = self.heroes.damages.clone();
         damages.retain(|hero| {
             self.filters
-                .is_selected(hero, lowest_level, Role::Damage, &self.session_picked)
+                .is_selected(hero, Role::Damage, &self.session_picked)
         });
         let mut supports = self.heroes.supports.clone();
         supports.retain(|hero| {
             self.filters
-                .is_selected(hero, lowest_level, Role::Support, &self.session_picked)
+                .is_selected(hero, Role::Support, &self.session_picked)
         });
         all_heroes.append(&mut tanks);
         all_heroes.append(&mut damages);
         all_heroes.append(&mut supports);
+        let lowest = all_heroes
+            .iter()
+            .fold(u32::MAX, |acc, hero| acc.min(hero.level));
+        println!("lowest level for heroes with filters applied = {lowest}");
+        all_heroes.retain(|hero| hero.level == lowest || !self.filters.lowest);
         all_heroes
     }
 }
@@ -285,11 +265,11 @@ impl eframe::App for PickMeApp {
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
                     if ui.button("Pick Me").clicked() {
-                        let mut all_heroes = self.apply_filters(lowest_level);
+                        let mut all_heroes = self.apply_filters();
 
                         if all_heroes.is_empty() && !self.session_picked.is_empty() {
                             self.session_picked.clear();
-                            all_heroes = self.apply_filters(lowest_level);
+                            all_heroes = self.apply_filters();
                         }
 
                         if let Some(hero) = all_heroes.choose(&mut rand::thread_rng()) {
