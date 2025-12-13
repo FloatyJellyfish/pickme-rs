@@ -66,7 +66,7 @@ impl Default for Heroes {
         Self {
             tanks: vec![
                 Hero::new("D.va", Role::Tank, true),
-                Hero::new("Doomfist", Role::Tank, false),
+                Hero::new("Doomfist", Role::Tank, true),
                 Hero::new("Hazard", Role::Tank, true),
                 Hero::new("Junker Queen", Role::Tank, true),
                 Hero::new("Mauga", Role::Tank, false),
@@ -99,6 +99,7 @@ impl Default for Heroes {
                 Hero::new("Tracer", Role::Damage, true),
                 Hero::new("Venture", Role::Damage, false),
                 Hero::new("Widowmaker", Role::Damage, false),
+                Hero::new("Vendeta", Role::Damage, false),
             ],
             supports: vec![
                 Hero::new("Ana", Role::Support, true),
@@ -111,7 +112,7 @@ impl Default for Heroes {
                 Hero::new("Lúcio", Role::Support, true),
                 Hero::new("Mercy", Role::Support, true),
                 Hero::new("Moira", Role::Support, true),
-                Hero::new("Wuyang", Role::Support, false),
+                Hero::new("Wuyang", Role::Support, true),
                 Hero::new("Zenyatta", Role::Support, true),
             ],
         }
@@ -125,6 +126,8 @@ pub struct Hero {
     pub role: Role,
     pub level: u32,
     pub favourite: bool,
+    #[serde(default)]
+    pub blacklisted: bool,
 }
 
 impl Hero {
@@ -135,6 +138,7 @@ impl Hero {
             favourite: false,
             stadium,
             role,
+            blacklisted: false,
         }
     }
 
@@ -144,6 +148,10 @@ impl Hero {
 
     pub fn toggle_favourite(&mut self) {
         self.favourite = !self.favourite;
+    }
+
+    pub fn toggle_blacklisted(&mut self) {
+        self.blacklisted = !self.blacklisted;
     }
 }
 

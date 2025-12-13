@@ -47,6 +47,7 @@ impl Filters {
                 || (self.damage && role == Role::Damage))
             && !(self.unique && session_picked.contains(hero))
             && (if self.stadium { hero.stadium } else { true })
+            && !hero.blacklisted
     }
 }
 
@@ -150,7 +151,15 @@ impl PickMeApp {
             {
                 hero.toggle_favourite();
             }
-            if selected {
+            if ui
+                .button(RichText::new("🚫").color(Color32::LIGHT_RED))
+                .clicked()
+            {
+                hero.toggle_blacklisted();
+            }
+            if hero.blacklisted {
+                ui.label(RichText::new(hero.to_string()).strikethrough());
+            } else if selected {
                 ui.label(RichText::new(hero.to_string()).strong());
             } else {
                 ui.label(RichText::new(hero.to_string()));
@@ -202,7 +211,6 @@ impl PickMeApp {
         let lowest = all_heroes
             .iter()
             .fold(u32::MAX, |acc, hero| acc.min(hero.level));
-        println!("lowest level for heroes with filters applied = {lowest}");
         all_heroes.retain(|hero| hero.level == lowest || !self.filters.lowest);
         all_heroes
     }
